@@ -1,37 +1,61 @@
-import { ChangeEvent, useState } from "react";
-import { Jsona } from "jsona";
-import JsonView from "react18-json-view";
-import "react18-json-view/src/style.css";
+import Code from "@/components/code";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import Code from "@/components/code";
+import { Jsona } from "jsona";
+import { ChangeEvent, useEffect, useState } from "react";
+import JsonView from "react18-json-view";
+import "react18-json-view/src/style.css";
 import { toast } from "sonner";
 
 function App() {
   const [rawJson, setRawJson] = useState({});
   const [jsona, setJsona] = useState<Object | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [debounceTimeout, setDebounceTimeout] = useState<number | null>(null);
+
   const formatter = new Jsona();
   const jsonaString = JSON.stringify(jsona);
   const base64EncodedString = btoa(jsonaString);
 
   const handleOnChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    try {
-      toast.dismiss();
-      setRawJson(JSON.parse(e.target.value));
-      setJsona(formatter.deserialize(e.target.value));
-      setErrors([]);
-    } catch (error) {
-      console.error(error);
-      if (error instanceof Error) {
-        setErrors([...errors, error.message]);
-        toast.error(error.message, {
-          duration: Infinity,
-          dismissible: true,
-        });
-      }
+    const value = e.target.value;
+
+    // Clear the previous timeout if it exists
+    if (debounceTimeout !== null) {
+      clearTimeout(debounceTimeout);
     }
+
+    // Debounce the users input.
+    const newTimeout = window.setTimeout(() => {
+      try {
+        toast.dismiss();
+        setErrors([]);
+        setRawJson(JSON.parse(value));
+        setJsona(formatter.deserialize(value));
+      } catch (error) {
+        console.error(error);
+        setJsona(null);
+        if (error instanceof Error) {
+          setErrors([...errors, error.message]);
+          toast.error(error.message, {
+            duration: Infinity,
+            dismissible: true,
+          });
+        }
+      }
+    }, 800);
+
+    setDebounceTimeout(newTimeout);
   };
+
+  // Clean up the timeout if the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
+    };
+  }, [debounceTimeout]);
 
   return (
     <main className="App container mx-auto py-12 space-y-4">
