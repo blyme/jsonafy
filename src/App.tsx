@@ -8,15 +8,20 @@ import "react18-json-view/src/style.css";
 import { toast } from "sonner";
 
 function App() {
-  const [rawJson, setRawJson] = useState({});
-  const [jsona, setJsona] = useState<Object | null>(null);
+  const [rawJson, setRawJson] = useState({
+    data: {
+      type: "articles",
+      id: "1",
+      attributes: {
+        title: "JSON:API 🚀",
+      },
+    },
+  });
+  const [jsona, setJsona] = useState<Object | null>(rawJson);
   const [errors, setErrors] = useState<string[]>([]);
   const [debounceTimeout, setDebounceTimeout] = useState<number | null>(null);
 
   const formatter = new Jsona();
-  const jsonaString = JSON.stringify(jsona);
-  const base64EncodedString = btoa(jsonaString);
-
   const handleOnChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
 
@@ -79,13 +84,8 @@ function App() {
         <div className="space-y-4">
           <div className="flex justify-between">
             <p>Result</p>
-            <Button asChild>
-              <a
-                href={`https://jsonhero.io/new?j=${base64EncodedString}`}
-                target="_blank"
-              >
-                Open in jsonhero
-              </a>
+            <Button onClick={() => postJsonToJsonHero(jsona ?? {})}>
+              Open in jsonhero
             </Button>
           </div>
           <div className="w-full p-2 border border-gray-300 rounded-md md:h-[768px] overflow-scroll">
@@ -98,3 +98,31 @@ function App() {
 }
 
 export default App;
+
+async function postJsonToJsonHero(jsona: Object) {
+  const requestBody = {
+    title: "From JSON:API to JSONA",
+    content: jsona ?? { foo: "bar" },
+    readOnly: false,
+  };
+
+  try {
+    const response = await fetch("https://jsonhero.io/api/create.json", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    window.open(data.location, "_blank");
+  } catch (error) {
+    console.error("Error posting JSON to jsonhero:", error);
+  }
+}
