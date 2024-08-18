@@ -1,66 +1,68 @@
 import Code from "@/components/code";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Jsona } from "jsona";
-import { ChangeEvent, useEffect, useState } from "react";
+import { useState } from "react";
 import JsonView from "react18-json-view";
 import "react18-json-view/src/style.css";
 import { toast } from "sonner";
+import { z } from "zod";
 
 function App() {
+  const formatter = new Jsona();
   const [rawJson, setRawJson] = useState({
     data: {
-      type: "articles",
-      id: "1",
+      type: "town",
+      id: "123",
       attributes: {
-        title: "JSON:API 🚀",
+        name: "Copenhagen",
+      },
+      relationships: {
+        country: {
+          data: {
+            type: "country",
+            id: "32",
+          },
+        },
       },
     },
+    included: [
+      {
+        type: "country",
+        id: "32",
+        attributes: {
+          name: "Denmark",
+        },
+      },
+    ],
   });
-  const [jsona, setJsona] = useState<Object | null>(rawJson);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [debounceTimeout, setDebounceTimeout] = useState<number | null>(null);
+  const [jsona, setJsona] = useState(formatter.deserialize(rawJson));
+  const [insertedJson, setInsertedJson] = useState("");
+  const urlSchema = z.string().url();
+  const jsonSchema = z.string().transform((value) => {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      throw new Error("Invalid JSON");
+    }
+  });
 
-  const formatter = new Jsona();
-  const handleOnChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-
-    // Clear the previous timeout if it exists
-    if (debounceTimeout !== null) {
-      clearTimeout(debounceTimeout);
+  const handleConvert = async () => {
+    if (urlSchema.safeParse(insertedJson).success) {
+      return GETJsonFromURL(insertedJson);
     }
 
-    // Debounce the users input.
-    const newTimeout = window.setTimeout(() => {
+    if (jsonSchema.safeParse(insertedJson).success) {
       try {
-        toast.dismiss();
-        setErrors([]);
-        setRawJson(JSON.parse(value));
-        setJsona(formatter.deserialize(value));
+        const parsedJson = JSON.parse(insertedJson);
+        setRawJson(parsedJson);
+        setJsona(formatter.deserialize(parsedJson));
       } catch (error) {
-        console.error(error);
-        setJsona(null);
-        if (error instanceof Error) {
-          setErrors([...errors, error.message]);
-          toast.error(error.message, {
-            duration: Infinity,
-            dismissible: true,
-          });
-        }
+        return toast.error("Invalid JSON data.");
       }
-    }, 800);
-
-    setDebounceTimeout(newTimeout);
+      return;
+    }
   };
-
-  // Clean up the timeout if the component unmounts.
-  useEffect(() => {
-    return () => {
-      if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
-      }
-    };
-  }, [debounceTimeout]);
 
   return (
     <main className="App container mx-auto py-12 space-y-4">
@@ -72,29 +74,58 @@ function App() {
         </h1>
       </div>
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-8">
-          <p>Insert JSON:API here</p>
-          <Textarea
-            className="w-full p-2 border border-gray-300 rounded-md md:h-[768px] overflow-scroll"
-            onChange={handleOnChange}
-            defaultValue={JSON.stringify(rawJson, null, 2)}
-          />
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Insert URL or JSON:API data..."
+              value={insertedJson}
+              onChange={(e) => setInsertedJson(e.target.value)}
+            />
+
+            <Button onClick={handleConvert}>Convert</Button>
+          </div>
+          <div className="w-full p-2 border border-gray-300 rounded-md  overflow-scroll">
+            <JsonView src={rawJson} />
+          </div>
         </div>
 
         <div className="space-y-4">
-          <div className="flex justify-between">
-            <p>Result</p>
-            <Button onClick={() => postJsonToJsonHero(jsona ?? {})}>
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => postJsonToJsonHero(jsona ?? { foo: "bar" })}
+            >
               Open in jsonhero
             </Button>
           </div>
-          <div className="w-full p-2 border border-gray-300 rounded-md md:h-[768px] overflow-scroll">
+          <div className="w-full p-2 border border-gray-300 rounded-md  overflow-scroll">
             <JsonView src={jsona ?? {}} collapsed={jsona ? false : true} />
           </div>
         </div>
       </section>
     </main>
   );
+
+  async function GETJsonFromURL(url: string) {
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        toast.error("Error fetching JSON from URL.");
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setRawJson(data);
+      setJsona(formatter.deserialize(data));
+      return data;
+    } catch (error) {
+      toast.error(
+        "Error fetching JSON from URL. Please check the console for more information."
+      );
+      console.error("Error fetching JSON from URL:", error);
+    }
+  }
 }
 
 export default App;
@@ -102,7 +133,7 @@ export default App;
 async function postJsonToJsonHero(jsona: Object) {
   const requestBody = {
     title: "From JSON:API to JSONA",
-    content: jsona ?? { foo: "bar" },
+    content: jsona,
     readOnly: false,
   };
 
@@ -123,6 +154,9 @@ async function postJsonToJsonHero(jsona: Object) {
 
     window.open(data.location, "_blank");
   } catch (error) {
-    console.error("Error posting JSON to jsonhero:", error);
+    toast.error(
+      "Error communicating with jsonhero. Please see the console for more information."
+    );
+    console.error("Error communicating with jsonhero:", error);
   }
 }
