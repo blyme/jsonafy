@@ -84,7 +84,7 @@ function App() {
 
             <Button onClick={handleConvert}>Convert</Button>
           </div>
-          <div className="w-full p-2 border border-gray-300 rounded-md  overflow-scroll">
+          <div className="w-full p-2 border border-gray-300 rounded-md overflow-scroll md:h-[768px]">
             <JsonView src={rawJson} />
           </div>
         </div>
@@ -98,7 +98,7 @@ function App() {
               Open in jsonhero
             </Button>
           </div>
-          <div className="w-full p-2 border border-gray-300 rounded-md  overflow-scroll">
+          <div className="w-full p-2 border border-gray-300 rounded-md  overflow-scroll md:h-[768px]">
             <JsonView src={jsona ?? {}} collapsed={jsona ? false : true} />
           </div>
         </div>
